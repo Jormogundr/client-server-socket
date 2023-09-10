@@ -54,9 +54,21 @@ int main(int argc, char * argv[]) {
     while (fgets(buf, sizeof(buf), stdin)) {
 		buf[MAX_LINE -1] = '\0';
 		len = strlen(buf) + 1;
-		send (s, buf, len, 0);
-		recv (s, rbuf, sizeof(rbuf), 0);
-		cout << "ECHO:" << rbuf;
+
+    if (strcmp(buf, "MSGGET\n") == 0) {
+      send (s, buf, len, 0);
+      recv (s, rbuf, sizeof(rbuf), 0);
+      cout << "ECHO: " << rbuf << endl;
+    }
+    else if (strcmp(buf, "QUIT\n") == 0) {
+      send (s, buf, len, 0);
+      recv (s, rbuf, sizeof(rbuf), 0);
+      cout << "ECHO: " << rbuf << endl;
+      exit(0);
+    }
+    else {
+      cout << "Command not recognized" << endl;
+    }
     }
 
     close(s);
