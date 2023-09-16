@@ -52,23 +52,69 @@ int main(int argc, char * argv[]) {
 
     /* main loop; get and send lines of text */
     while (fgets(buf, sizeof(buf), stdin)) {
-		buf[MAX_LINE -1] = '\0';
+		buf[MAX_LINE - 1] = '\0';
 		len = strlen(buf) + 1;
 
-    if (strcmp(buf, "MSGGET\n") == 0) {
+    // store all command line args for possible use
+    char args[MAX_LINE];
+    strcpy(args, buf);
+    
+    // extract the command from user input
+    char* token = strtok(buf, " ");
+    string command(token);
+
+    if (command == "MSGGET\n") {
       send (s, buf, len, 0);
       recv (s, rbuf, sizeof(rbuf), 0);
       cout << "ECHO: " << rbuf << endl;
     }
-    else if (strcmp(buf, "QUIT\n") == 0) {
+    else if (command == "QUIT\n") {
       send (s, buf, len, 0);
       recv (s, rbuf, sizeof(rbuf), 0);
+      // TODO: cleanup memory before quitting?
       cout << "ECHO: " << rbuf << endl;
       exit(0);
     }
-    else {
-      cout << "Command not recognized" << endl;
+    else if (command == "LOGIN") {
+      send (s, args, len, 0);
+      recv (s, rbuf, sizeof(rbuf), 0);
+      cout << "ECHO: " << rbuf << endl;
     }
+    else if (command == "LOGIN\n") {
+      cout << "ERROR: Username and password must be passed as arguments." << endl;
+    }
+    else if (command == "LOGOUT\n") {
+      send (s, args, len, 0);
+      recv (s, rbuf, sizeof(rbuf), 0);
+      cout << "ECHO: " << rbuf << endl;
+    }
+    else if (command == "MSGSTORE\n") {
+      send (s, args, len, 0);
+      recv (s, rbuf, sizeof(rbuf), 0);
+      if (strncmp(rbuf, "200", 3) == 0) {
+        cout << rbuf << endl << "Client: Authorized, enter message" << endl;
+        fgets(buf, sizeof(buf), stdin);
+        cout << "Client: Sending message to store: " << buf << endl;
+        send (s, buf, sizeof(buf), 0);
+        recv (s, rbuf, sizeof(rbuf), 0);
+        cout << "ECHO: " << rbuf << endl;
+      } 
+      else {cout << "ECHO: " << rbuf << endl;}
+      }
+    else if (command == "SHUTDOWN\n") {
+      send (s, buf, sizeof(buf), 0);
+      cout << "client shudown before receiving rbuf " << rbuf << endl;
+      recv (s, rbuf, MAX_LINE, 0);
+      cout << "client shudown after receiving rbuf " << rbuf << endl;
+      cout << "ECHO: " << rbuf << endl;
+    }
+    else {
+      cout << "Client: Command not recognized" << endl;
+    }
+    // flush buffers
+    memset(buf, 0, MAX_LINE);
+    memset(rbuf, 0, MAX_LINE);
+    memset(args, 0, MAX_LINE);
     }
 
     close(s);
