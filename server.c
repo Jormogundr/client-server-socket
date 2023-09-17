@@ -23,12 +23,6 @@ using namespace std;
 #define SERVER_PORT 2233
 #define MAX_PENDING 5
 #define MAX_LINE 256
-#define MAX_USERS 4
-
-struct user {
-  char* user;
-  char* password;
-};
 
 unordered_map<string, string> user_credentials = {
   {"root", "root01"},
@@ -36,7 +30,6 @@ unordered_map<string, string> user_credentials = {
   {"david", "david01"},
   {"mary", "mary01"}
 };
-
 
 class Server {
   public:
@@ -192,10 +185,6 @@ class Server {
 
     void setMessageSize(char* msg) {
       current_message_size = (sizeof(msg)/sizeof(msg[0]));
-    }
-
-    int getMessageSize() {
-    return current_message_size;
     }
 
     void setAuthenticated(bool flag) {
