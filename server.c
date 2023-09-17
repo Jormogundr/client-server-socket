@@ -31,10 +31,10 @@ struct user {
 };
 
 unordered_map<string, string> user_credentials = {
-  {"bob", "password"},
-  {"alice", "secretkey"},
-  {"marshall", "sudormf/"},
-  {"august", "notsecure"}
+  {"root", "root01"},
+  {"john", "john01"},
+  {"david", "david01"},
+  {"mary", "mary01"}
 };
 
 
@@ -44,7 +44,14 @@ class Server {
     int current_message_idx;
     int current_message_size;
     bool authenticated;
-    vector<string> messages {"message1", "message2", "message3"};
+    bool isRoot;
+    vector<string> messages {
+      "You create your own opportunities.\n", 
+      "Never break your promises.\n", 
+      "You are never as stuck as you think you are.\n",
+      "Happiness is a choice.\n",
+      "Habits develop into character.\n"
+      };
 
     // return message of the day as string
     string getMessageOfTheDay() {
@@ -57,7 +64,6 @@ class Server {
 
       string msg = messages[current_message_idx];
       current_message_size = msg.size();
-
       return msg;
     }
 
@@ -66,6 +72,7 @@ class Server {
       current_message_idx = 0;
       num_messages = messages.size();
       authenticated = false;
+      isRoot = false;
     }
 
     void addMotd(char* buf) {
@@ -76,7 +83,7 @@ class Server {
 
     void storeMessage(char* buf) {
       addMotd(buf);
-      string confirmed = "200-OK\n, message stored\n";
+      string confirmed = "200, message stored\n";
       char* response = const_cast<char*>(confirmed.c_str());
       memcpy(buf, response, MAX_LINE);
     }
@@ -84,32 +91,32 @@ class Server {
     // if user has authenticated and logged in, return true else false
     bool validateUser(char* buf) {      
       if (getAuthenticated() == false) {
-          string not_authorized = "401-\nYou are not currently logged in, login first\n";
+          string not_authorized = "401, Permission denied\n";
           char* failure = const_cast<char*>(not_authorized.c_str());
           memcpy(buf, failure, MAX_LINE);
           return false;
       }
-      string authorized = "200-OK\n, user logged in\n";
+      string authorized = "200, User credentials valid\n";
       char* success = const_cast<char*>(authorized.c_str());
       memcpy(buf, success, MAX_LINE);
       return true;
     }
 
     void buildMessage(char* buf) {
-      string res_code = "200-OK\n";
-      char* msg = const_cast<char*>(getMessageOfTheDay().c_str());
-      char* response = const_cast<char*>(res_code.c_str());
-      strcat(response, msg);
-      strcpy(buf, response);
-      setMessageSize(msg, response);
+      string response = "200, OK\n";
+      string motd = getMessageOfTheDay();
+      string res = response + motd;
+      memcpy(buf, const_cast<char*>(res.c_str()), MAX_LINE);
+      cout << buf << endl;
+      setMessageSize(buf);
     }
 
     void shutdown(char* buf, int socket) {
-      cout << "Shutdown" << endl;
-      string authorized = "200-OK\nShutting server down\n";
+      cout << "Sever: Shutting down..." << endl;
+      string authorized = "200, Shutting server down\n";
       char* success = const_cast<char*>(authorized.c_str());
       memcpy(buf, success, MAX_LINE);
-      send (socket, buf, sizeof(buf) + 1, 0);
+      send (socket, buf, MAX_LINE, 0);
       close(socket);
       exit(0);
     }
@@ -135,24 +142,27 @@ class Server {
             string password(pch);
             credentials.push_back(password);
           }
-          else {
-            cout << "Too many arguments provided" << endl;
-            break;
-          }
           pch = strtok(NULL, " ");
           counter++;
       }
-
-      assert(credentials.size() == 2);
+      
+      bool credential_size = (credentials.size() == 2);
+      if (!credential_size) {
+          string success_str = "200, Number of credentials (user, password) not satisfied. Try again";
+          char* success = const_cast<char*>(success_str.c_str());
+          memcpy(buf, success, MAX_LINE);
+          return;
+      }
 
       if (authenicateUser(credentials[0], credentials[1])) {
-          string success_str = "200-OK\nAuthentication success";
+        if (credentials[0] == "root") {isRoot = true;}
+          string success_str = "200, Authentication success\n";
           char* success = const_cast<char*>(success_str.c_str());
           memcpy(buf, success, MAX_LINE);
           setAuthenticated(true);
       }
       else {
-          string fail_str = "410\nWrong UserID or Password\nAuthentication failed\n";
+          string fail_str = "401, Wrong UserID or Password\nAuthentication failed\n";
           char* failure = const_cast<char*>(fail_str.c_str());
           memcpy(buf, failure, MAX_LINE);
         }
@@ -168,19 +178,20 @@ class Server {
     }
 
     void logout(char* buf) {
-      string res_code = "200 - OK";
+      string res_code = "200, OK";
       char* response = const_cast<char*>(res_code.c_str());
       memcpy(buf, response, MAX_LINE);
       setAuthenticated(false);
+      isRoot = false;
     }
 
     void quit(char* buf) {
-      string res_code = "200-OK\nLogging out...\n";
+      string res_code = "200, Closing connection\n";
       strcpy(buf, res_code.c_str());
     }
 
-    void setMessageSize(char* msg, char* response) {
-      current_message_size = (sizeof(msg)/sizeof(msg[0])) + (sizeof(response)/sizeof(response[0]));
+    void setMessageSize(char* msg) {
+      current_message_size = (sizeof(msg)/sizeof(msg[0]));
     }
 
     int getMessageSize() {
@@ -193,6 +204,10 @@ class Server {
 
     bool getAuthenticated() {
       return authenticated;
+    }
+
+    bool getIsRoot() {
+      return isRoot;
     }
 };
 
@@ -247,21 +262,28 @@ int main(int argc, char **argv) {
      
     Server motd;
 		while (len = recv(new_s, buf, sizeof(buf), 0)) {
-      // copy contents of buf to new buffer as tokenization below modifies the buffer
       char response[MAX_LINE] = "";
+    
+      // strtok modifies buf by inserting terminating chars \000 so copy buf into new buffer for commands w/ args
       char unmodified_buf[MAX_LINE];
       memcpy(unmodified_buf, buf, MAX_LINE);
-
-      // strtok modifies buf by inserting terminating chars \000
       char* token = strtok(buf, " ");
       string command(token);
+
       if (command == "MSGGET\n") {
-        motd.buildMessage(response);
-        send (new_s, response, motd.getMessageSize() + 1, 0);
+        if (motd.getAuthenticated()) {
+          motd.buildMessage(buf);
+        }
+        else {
+          string fail_str = "401, User not authenticated\n";
+          char* failure = const_cast<char*>(fail_str.c_str());
+          memcpy(buf, failure, MAX_LINE);
+        }
+        send (new_s, buf, MAX_LINE, 0);
       }
       else if (command == "QUIT\n") {
         motd.quit(response);
-        send (new_s, response, strlen(response) + 1, 0);
+        send (new_s, response, MAX_LINE, 0);
         exit(0);
       }
       // a new line is not expected at the end of this command since additional arguments must be provided
@@ -269,33 +291,33 @@ int main(int argc, char **argv) {
         // newline char delimits the end of the command provided by user
         char* args = strtok(unmodified_buf, "\n");
         motd.login(args, buf);
-        send (new_s, buf, strlen(buf) + 1, 0);
+        send (new_s, buf, MAX_LINE, 0);
       }
       else if (command == "LOGOUT\n") {
         motd.logout(response);
-        send (new_s, response, strlen(response) + 1, 0);
+        send (new_s, response, MAX_LINE, 0);
       }
       else if (command == "MSGSTORE\n") {
         // newline char delimits the end of the command provided by user
         char* args = strtok(unmodified_buf, "\n");
         bool authorized;
         motd.validateUser(buf) ? authorized = true : authorized = false;
-        send (new_s, buf, strlen(buf) + 1, 0);
+        send (new_s, buf, MAX_LINE, 0);
         if (authorized) {
           cout << "Server: waiting for user input..." << endl;
-          recv (new_s, buf, sizeof(buf), 0);
+          recv (new_s, buf, MAX_LINE, 0);
           cout << "Server: received message: " << buf << endl;
           motd.storeMessage(buf);
-          send (new_s, buf, strlen(buf) + 1, 0);
+          send (new_s, buf, MAX_LINE, 0);
         }
       }
       else if (command == "SHUTDOWN\n") {
         bool authorized;
         motd.validateUser(buf) ? authorized = true : authorized = false;
-        if (authorized == true) {
+        cout << buf << motd.getIsRoot() << endl;
+        if (authorized == true && motd.getIsRoot()) {
           motd.shutdown(buf, new_s);
         }
-        cout << "in shutdown block " << buf << endl;
         send (new_s, buf, MAX_LINE, 0);
         
       }
