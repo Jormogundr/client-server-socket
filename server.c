@@ -15,7 +15,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <cassert> 
 
 using namespace std;
@@ -24,7 +24,7 @@ using namespace std;
 #define MAX_PENDING 5
 #define MAX_LINE 256
 
-unordered_map<string, string> user_credentials = {
+map<string, string> user_credentials = {
   {"root", "root01"},
   {"john", "john01"},
   {"david", "david01"},

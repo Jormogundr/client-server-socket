@@ -6,10 +6,12 @@ all: client server
 
 # To make an executable
 client: client.o 
-	$(CC) $(LDFLAGS) -o client client.o
+	$(CC) $(LDFLAGS) -o  bin/client client.o \
+		-Wl,--rpath=deps/libc.so.6,deps/libgcc_s.so.1,deps/libm.so.6,deps/libstdc++.so.6
  
 server: server.o
-	$(CC) $(LDFLAGS) -o server server.o
+	$(CC) $(LDFLAGS) -o bin/server server.o \
+		-Wl,--rpath=deps/libc.so.6,deps/libgcc_s.so.1,deps/libm.so.6,deps/libstdc++.so.6
 
 # To make an object from source
 .c.o:
@@ -17,5 +19,5 @@ server: server.o
 
 # clean out the dross
 clean:
-	-rm client server *.o core
+	-rm bin/* *.o 
 
