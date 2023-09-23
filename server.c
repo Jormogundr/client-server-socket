@@ -1,6 +1,7 @@
 /*
  * server.c
  */
+#define _GLIBCXX_USE_CXX11_ABI 0
 
 #include <stdio.h>
 #include <iostream>
@@ -24,20 +25,17 @@ using namespace std;
 #define MAX_PENDING 5
 #define MAX_LINE 256
 
-map<string, string> user_credentials = {
-  {"root", "root01"},
-  {"john", "john01"},
-  {"david", "david01"},
-  {"mary", "mary01"}
-};
+map<string, string> user_credentials;
 
 class Server {
   public:
+    // store indices for message of the day 
     int num_messages;
     int current_message_idx;
-    int current_message_size;
-    bool authenticated;
-    bool isRoot;
+    int current_message_size; 
+    // store user state
+    bool authenticated; 
+    bool isRoot; 
     vector<string> messages {
       "You create your own opportunities.\n", 
       "Never break your promises.\n", 
@@ -46,19 +44,19 @@ class Server {
       "Habits develop into character.\n"
       };
 
-    // return message of the day as string
+    // Retrive the current message of the day and set index
     string getMessageOfTheDay() {
 
-      // check if we are at the end of the 0-indexed vector of messages, and wrap back to 0 as needed
-      if (current_message_idx < num_messages - 1)
-          current_message_idx++;
-      else 
-        current_message_idx = 0;
+        // check if we are at the end of the 0-indexed vector of messages, and wrap back to 0 as needed
+        if (current_message_idx < num_messages - 1)
+            current_message_idx++;
+        else 
+          current_message_idx = 0;
 
-      string msg = messages[current_message_idx];
-      current_message_size = msg.size();
-      return msg;
-    }
+        string msg = messages[current_message_idx];
+        current_message_size = msg.size();
+        return msg;
+      }
 
     // constructor
     Server() {
@@ -66,14 +64,23 @@ class Server {
       num_messages = messages.size();
       authenticated = false;
       isRoot = false;
+
+      // initialize the user_credentials map
+      vector<string> users  = {"root", "john", "david", "mary"};
+      vector<string> passwords = {"root01", "john01", "david01", "mary01"};
+      for (int i = 0; i < 3; i++) {
+        user_credentials.insert(make_pair(users[i], passwords[i]));
+      }
     }
 
+    // helper to allow user to MSGSTORE
     void addMotd(char* buf) {
       string message(buf);
       messages.push_back(message);
       num_messages++;
     }
 
+    // main function for MSGSTORE
     void storeMessage(char* buf) {
       addMotd(buf);
       string confirmed = "200, message stored\n";
@@ -81,7 +88,7 @@ class Server {
       memcpy(buf, response, MAX_LINE);
     }
 
-    // if user has authenticated and logged in, return true else false
+    // Check if user has authenticated with LOGIN, return false is not
     bool validateUser(char* buf) {      
       if (getAuthenticated() == false) {
           string not_authorized = "401, Permission denied\n";
@@ -95,6 +102,7 @@ class Server {
       return true;
     }
 
+    // helper for MSGSTORE
     void buildMessage(char* buf) {
       string response = "200, OK\n";
       string motd = getMessageOfTheDay();
@@ -104,6 +112,7 @@ class Server {
       setMessageSize(buf);
     }
 
+    // main function for SHUTDOWN
     void shutdown(char* buf, int socket) {
       cout << "Sever: Shutting down..." << endl;
       string authorized = "200, Shutting server down\n";
@@ -114,6 +123,7 @@ class Server {
       exit(0);
     }
 
+    // LOGIN
     void login(char* args, char* buf) {
       char* pch;
       pch = strtok(args," ");
@@ -146,7 +156,8 @@ class Server {
           memcpy(buf, success, MAX_LINE);
           return;
       }
-
+      
+      // Check if user is root and has correct password, and set isRoot accordingly
       if (authenicateUser(credentials[0], credentials[1])) {
         if (credentials[0] == "root") {isRoot = true;}
           string success_str = "200, Authentication success\n";
@@ -161,6 +172,7 @@ class Server {
         }
     }
 
+    // helper for various credentials related functions
     bool authenicateUser(string user, string password) {
       if (user_credentials[user] == password) {
         return true;
@@ -170,6 +182,7 @@ class Server {
       }
     }
 
+    // LOGOUT
     void logout(char* buf) {
       string res_code = "200, OK";
       char* response = const_cast<char*>(res_code.c_str());
